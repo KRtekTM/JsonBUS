@@ -2,3 +2,7 @@
 .vs/
 
 JsonBUS.demo/obj/
+/JsonBUS.demo/bin/Debug
+/JsonBUS.manager.ETS2/bin/Debug
+/JsonBUS.manager.ETS2/obj/Debug
+/packages
