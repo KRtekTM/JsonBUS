@@ -1,0 +1,5 @@
+{
+  "httpListen":  true,
+  "httpListenPort": "8085",
+  "serialPorts": [ "COM6", "COM10" ],
+}

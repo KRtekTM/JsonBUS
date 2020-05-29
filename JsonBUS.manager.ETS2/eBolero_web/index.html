@@ -1,0 +1,237 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>ŠKODA eBolero</title>
+  <meta name="description" content="ŠKODA eBolero">
+  <meta name="author" content="SitePoint">
+
+  <link href="fonts/skodafont.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="jquery-3.5.1.js"></script>
+</head>
+
+<body onload="startTime();">
+  <video id="videoIntro" src="skoda_intro.mp4"></video>
+
+  <div id="eBolero">
+    <div id="time"></div>
+
+    <div id="menu">
+        <!--<div class="button" onclick="$('.screen').hide(); $('#media').show();">MEDIA</div>-->
+        <div class="button" onclick="$('.screen').hide(); $('#radio').show();">RADIO</div>
+        <div class="button" onclick="$('.screen').hide(); $('#navig').show();">NAVIG</div>
+        <div class="button" onclick="$('.screen').hide(); $('#stats').show();">ABOUT</div>
+    </div>
+
+    <div id="home" class="screen">
+        <img src="images/skoda2.png" />
+    </div>
+
+    <div id="media" class="screen">
+
+    </div>
+
+    <div id="radio" class="screen">
+        <div id="radioInfo">
+            <h1></h1>
+            <span id="radioFrequency"></span>
+        </div>
+
+        <div class="radioButton" onclick="PlayRadio('http://stream-uk1.radioparadise.com/rp_96.ogg', 'Radio Paradise', 'Internet');">
+            <img src="images/radioparadise.png" />
+        </div>
+
+        <div class="radioButton" onclick="PlayRadio('http://ice.abradio.cz/blanikfm128.mp3', 'Rádio BLANÍK', 'Internet');">
+            <img src="images/radioblanik.png" />
+        </div>
+
+        <div class="radioButton" onclick="PlayRadio('http://icecast1.play.cz/signal128.mp3', 'Signál Rádio', '98.1 FM');">
+            <img src="images/radiosignal.png" />
+        </div>
+
+        <div class="radioButton" onclick="PlayRadio('http://radio.piratsky.space/radio/8000/radio.mp3', 'Limonádové RádiJO', '90.3 FM');">
+            <img src="images/radiojoe.png" />
+        </div>
+
+        <div class="radioButton" onclick="PlayRadio('http://icecast8.play.cz/color128.mp3', 'COLOR MUSIC RADIO', '99.4 FM');">
+            <img src="images/radiocolor.jpeg" />
+        </div>
+        <div class="cover"></div>
+    </div>
+
+    <div id="navig" class="screen">
+        <div id="navigBar">
+
+        </div>
+        <iframe src="https://ets2map.com/"></iframe>
+    </div>
+
+    <div id="stats" class="screen">
+        <img src="images/skoda3.png" />
+        <p>
+            eBolero <span id="version"></span>
+        </p>
+    </div>
+
+    <audio id="radioPlayer" src=""></audio>
+
+  </div>
+
+  <script>
+    var Clock = $("#time");
+    var Version = $("#version");
+    $("#videoIntro").get(0).load();
+    
+    //var jsonObj = null;
+    var simulationOn = false;
+    var electricityOn = false;
+    var electricityLast = false;
+    var indicators = false;
+    var overspeed = false;
+    var gameTime = "NOT RUNNING";
+    var lastRadio = "";
+    var lastRadioInfo = "";
+    var lastRadioFrq = "";
+    var gameVersion = "";
+
+    function startTime() {
+      // GET JSON object from JsonBUS telemetry server
+      $.get("http://localhost:8085", {}, function(data) {
+          //jsonObj = data; //jQuery.parseJSON(data); // no parse when input type is json
+
+          gameTime = data.gameTime;
+          simulationOn = (data.simulationOn == "TRUE") ? true : false;
+          electricityOn = (data.electricityOn == "TRUE") ? true : false;
+          indicators = data.indicators;
+          overspeed = (data.overspeed == "TRUE") ? true : false;
+          gameVersion = data.gameVersion;
+      })
+      .fail(function() {
+          simulationOn = false;
+      });
+
+      if(simulationOn) {
+        if($('#eBolero').is(':visible')) {
+              Clock.text(gameTime);
+              Version.text(gameVersion);
+              /*switch(indicators) {
+                  case "1":
+                      Clock.css("background", "url(\"images/line_left.png\") no-repeat");
+                      Clock.css("background-position", "center bottom");
+                      break;
+                  case "2":
+                      Clock.css("background", "url(\"images/line_right.png\") no-repeat");
+                      Clock.css("background-position", "center bottom");
+                      break;
+                  case "3":
+                      Clock.css("background", "url(\"images/line_both.png\") no-repeat");
+                      Clock.css("background-position", "center bottom");
+                      break;
+                  default:
+                      Clock.css("background", "url(\"images/line.png\") no-repeat");
+                      Clock.css("background-position", "center bottom");
+                      break;
+              }*/
+              if(overspeed) {
+              //console.log("overspeed: " + overspeed.toString());
+                $("#eBolero").css("background", "#990000");
+              }
+              else {
+                $("#eBolero").css("background", "#000000");
+              }
+          }
+
+          if(electricityOn && electricityOn != electricityLast && !$('#eBolero').is(':visible')) {
+              //window.alert("turning on");
+              electricityLast = electricityOn;
+              TurnOn();
+          }
+          else if (!electricityOn && electricityOn != electricityLast && $('#eBolero').is(':visible')){
+              //window.alert("turning off");
+              electricityLast = electricityOn;
+              TurnOff();
+          }
+      }
+      /*else {
+        // Clock part
+        var today = new Date();
+        var h = today.getHours();
+        var m = today.getMinutes();
+        var s = today.getSeconds();
+        h = checkTime(h);
+        m = checkTime(m);
+        s = checkTime(s);
+        Clock.text(h + ":" + m); // + ":" + s);
+
+          if(electricityLast == false) {
+              electricityLast = true;
+
+              TurnOn();
+          }
+      }*/
+
+      // Set trigger to 100ms
+      var t = setTimeout(startTime, 500);
+    }
+
+    function checkTime(i) {
+        if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+        return i;
+    }
+
+    function TurnOn() {
+        $("#videoIntro").get(0).currentTime = 0;
+        $("#videoIntro").show();
+        $("#videoIntro").get(0).play();
+        setTimeout(TurnOnAfterIntro, 4000);
+    }
+
+    function TurnOnAfterIntro() {
+        $("#videoIntro").hide();
+        $("#eBolero").fadeIn("slow", function() {
+            startTime();
+            $("#home").fadeIn("slow", function() {
+                setTimeout(TurnOnRadioAfterBoot, 2000);
+            });
+        });
+    }
+
+    function TurnOnRadioAfterBoot() {
+        $("#home").fadeOut("slow", function() {
+            $("#radio").fadeIn("slow", function() {
+                if(lastRadio == "" && lastRadioInfo == "" && lastRadioFrq == "") {
+                    PlayRadio('http://stream-uk1.radioparadise.com/rp_96.ogg', 'Radio Paradise', 'Internet');
+                }
+                else {
+                    PlayRadio(lastRadio, lastRadioInfo, lastRadioFrq);
+                }
+            });
+        });
+    }
+
+    function TurnOff() {
+        $("#eBolero").hide();
+        $("#videoIntro").get(0).pause();
+        $('#radioPlayer').get(0).pause();
+        $('.screen').hide();
+    }
+
+    function PlayRadio(url, info, frq) {
+        $('#radioPlayer').get(0).pause();
+        $('#radioPlayer').attr('src',url);
+        $('#radioInfo h1').text(info);
+        $('#radioFrequency').text(frq);
+        $('#radioPlayer').get(0).play();
+
+        lastRadio = url;
+        lastRadioInfo = info;
+        lastRadioFrq = frq;
+    }
+
+  </script>
+</body>
+</html>

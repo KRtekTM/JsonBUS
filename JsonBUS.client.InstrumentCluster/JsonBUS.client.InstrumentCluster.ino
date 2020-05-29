@@ -1,5 +1,7 @@
 #include "SwitecX25.h"
 #include "ArduinoJson.h"
+#include <Multi_BitBang.h>
+#include <Multi_OLED.h>
 
 // standard X25.168 range 315 degrees at 1/3 degree steps
 #define STEPS (315*3)
@@ -30,19 +32,44 @@ const int warn_handbrake = 37;
 const int warn_battery = 38;
 const int cruisecontrol = 30;
 const int speaker = 42;
-const int reservePin0 = 39;
-const int reservePin1 = 40;
-const int reservePin2 = 41;
+const int trailer = 39;
+const int beacon = 40;
+const int both_indicators = 41;
 
 const int noteFrequency = 4500;
 
 int state_electricity, state_blinker = 0;
 bool state_gasLow = false;
+int msgFuel, msgRange = 0;
+
+bool cityShown = false;
+String lastCity = "";
+
+bool showTime = true;
+String lastTime = "";
+
+bool lowFuelBeep = false;
+
+// OLED display settings
+#define NUM_DISPLAYS 2
+#define NUM_BUSES 2
+// I2C bus info
+uint8_t scl_list[NUM_BUSES] = {5,7}; //pins
+uint8_t sda_list[NUM_BUSES] = {6,8};  //pins
+int32_t speed_list[NUM_BUSES] = {4000000L,4000000L};
+// OLED display info
+uint8_t bus_list[NUM_DISPLAYS] = {0,1}; // can be multiple displays per bus
+uint8_t addr_list[NUM_DISPLAYS] = {0x3c, 0x3c};
+uint8_t type_list[NUM_DISPLAYS] = {OLED_128x32, OLED_128x32};
+uint8_t flip_list[NUM_DISPLAYS] = {0,1};
+uint8_t invert_list[NUM_DISPLAYS] = {0,0};
 
 // Celebration is typical Skoda/Volkswagen instrument cluster lightshow when electricity is on
 void clusterCelebration() {
+  Serial.end(); // reactivate on end of celebration to prevent looping
   // Ignition switch position 1
-  analogWrite(cluster_light, 10);
+  //analogWrite(cluster_light, 10);
+  Multi_OLEDWriteString(1, 0, -1, "SKODA", FONT_LARGE, 0);
   digitalWrite(airbag, HIGH);
   digitalWrite(warn_temp, HIGH);
   digitalWrite(warn_gas, HIGH);
@@ -101,6 +128,8 @@ void clusterCelebration() {
   digitalWrite(warn_oil, LOW);
   digitalWrite(warn_immobilizer, LOW);
   noTone(speaker);
+  
+  WriteLeftOLED("", true, false);
 
   delay(1000);
   digitalWrite(warn_immobilizer, HIGH);
@@ -110,10 +139,14 @@ void clusterCelebration() {
   digitalWrite(warn_immobilizer, LOW);
   noTone(speaker);
 
+  //String msggg = (String)"CC 0 km/h           ";
+  //WriteRightOLED(msggg.c_str(), false, 3);
+        
+  Serial.begin(115200);
 }
 
 void clusterTurnOff() {
-  digitalWrite(cluster_light, LOW);
+  analogWrite(cluster_light, 0);
   digitalWrite(left_indicator, LOW);
   digitalWrite(right_indicator, LOW);
   digitalWrite(airbag, LOW);
@@ -131,11 +164,18 @@ void clusterTurnOff() {
   digitalWrite(warn_handbrake, LOW);
   digitalWrite(warn_battery, LOW);
   digitalWrite(cruisecontrol, LOW);
+  digitalWrite(trailer, LOW);
+  digitalWrite(beacon, LOW);
+  digitalWrite(both_indicators, LOW);
 
   //gauge_rpm.zero();
   //gauge_speed.zero();
   //gauge_temp.zero();
   //gauge_gas.zero();
+
+  WriteLeftOLED("", true, false);
+  WriteRightOLED("",true,0);
+  cityShown = false;
 }
 
 void testLights() {
@@ -157,70 +197,9 @@ void testLights() {
   digitalWrite(warn_handbrake, HIGH);
   digitalWrite(warn_battery, HIGH);
   digitalWrite(cruisecontrol, HIGH);
-
-  delay(10000);
-
-  clusterTurnOff();
-
-  analogWrite(cluster_light, 100);
-  delay(300);
-  analogWrite(cluster_light, 0);
-  digitalWrite(left_indicator, HIGH);
-  delay(300);
-  digitalWrite(left_indicator, LOW);
-  digitalWrite(right_indicator, HIGH);
-  delay(300);
-  digitalWrite(right_indicator, LOW);
-  digitalWrite(airbag, HIGH);
-  delay(300);
-  digitalWrite(airbag, LOW);
-  digitalWrite(light_lowbeam, HIGH);
-  delay(300);
-  digitalWrite(light_lowbeam, LOW);
-  digitalWrite(light_fogFront, HIGH);
-  delay(300);
-  digitalWrite(light_fogFront, LOW);
-  digitalWrite(light_fogRear, HIGH);
-  delay(300);
-  digitalWrite(light_fogRear, LOW);
-  digitalWrite(light_mainbeam, HIGH);
-  delay(300);
-  digitalWrite(light_mainbeam, LOW);
-  digitalWrite(warn_temp, HIGH);
-  delay(300);
-  digitalWrite(warn_temp, LOW);
-  digitalWrite(cruisecontrol, HIGH);
-  delay(300);
-  digitalWrite(cruisecontrol, LOW);
-  digitalWrite(warn_gas, HIGH);
-  delay(300);
-  digitalWrite(warn_gas, LOW);
-  digitalWrite(warn_oil, HIGH);
-  delay(300);
-  digitalWrite(warn_oil, LOW);
-  digitalWrite(warn_engine, HIGH);
-  delay(300);
-  digitalWrite(warn_engine, LOW);
-  digitalWrite(warn_failure, HIGH);
-  delay(300);
-  digitalWrite(warn_failure, LOW);
-  digitalWrite(warn_abs, HIGH);
-  delay(300);
-  digitalWrite(warn_abs, LOW);
-  digitalWrite(warn_immobilizer, HIGH);
-  delay(300);
-  digitalWrite(warn_immobilizer, LOW);
-  digitalWrite(warn_handbrake, HIGH);
-  delay(300);
-  digitalWrite(warn_handbrake, LOW);
-  digitalWrite(warn_battery, HIGH);
-  delay(300);
-  digitalWrite(warn_battery, LOW);
-
-
-  delay(500);
-
-  //testLights();
+  digitalWrite(trailer, HIGH);
+  digitalWrite(beacon, HIGH);
+  digitalWrite(both_indicators, HIGH);
 }
 
 void busCommunication() {
@@ -277,10 +256,15 @@ void busCommunication() {
       }
       break;
 
-    // cruisecontrol on/off
+    // internet connected/disconnected
     case 232:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(cruisecontrol, HIGH) : digitalWrite(cruisecontrol, LOW);
+      if(state_electricity != 0) {
+        if (featureValue == 1) {
+          digitalWrite(airbag, HIGH);
+        }
+        else {
+          digitalWrite(airbag, LOW);
+        }
       }
       break;
 
@@ -302,12 +286,17 @@ void busCommunication() {
       
     // gas level
     case 234:
-      // turn the control on when gas level is below 10%
+      // turn the control on when gas level is below 15%
       if (featureValue <= 15) {
         digitalWrite(warn_gas, HIGH);
+        if(!lowFuelBeep) {
+          tone(speaker, noteFrequency, 500);
+          lowFuelBeep = true;
+        }
       }
       else {
         digitalWrite(warn_gas, LOW);
+        lowFuelBeep = false;
       }
 
       // control the gauge (MIN=5%,MAX=100%)
@@ -384,6 +373,7 @@ void busCommunication() {
         case 3:
           digitalWrite(left_indicator, HIGH);
           digitalWrite(right_indicator, HIGH);
+          digitalWrite(both_indicators, HIGH);
             if(state_blinker == 0) {
               tone(speaker, 500, 10);
               state_blinker = 1;
@@ -392,6 +382,7 @@ void busCommunication() {
         default:
           digitalWrite(left_indicator, LOW);
           digitalWrite(right_indicator, LOW);
+          digitalWrite(both_indicators, LOW);
           if(state_blinker == 1) {
             tone(speaker, 300, 10);
             state_blinker = 0;  
@@ -453,6 +444,105 @@ void busCommunication() {
       }
       break;
 
+    // trailer attache indicator on/off
+    case 249:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        (featureValue == 1) ? digitalWrite(trailer, HIGH) : digitalWrite(trailer, LOW);
+      }
+      break;
+
+    // beacon light indicator on/off
+    case 250:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        (featureValue == 1) ? digitalWrite(beacon, HIGH) : digitalWrite(beacon, LOW);
+      }
+      break;
+
+    case 251:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        if(featureValue != 0) {
+          lastTime = featureText;
+          if(showTime) {
+            String msggg = (String)lastTime + (String)"              ";
+            WriteLeftOLED(msggg.c_str(), false, true);  
+          }
+        }
+      }
+      break;  
+
+    
+    case 252:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        if(featureValue != 0) {
+          if((String)featureText != "NULL" && (String)featureText != "") {
+            if(!cityShown || lastCity != (String)(featureText)) {
+              lastCity = (String)(featureText);
+              String msgggCity = lastCity + (String)("                ");
+              WriteRightOLED(msgggCity.c_str(), false, 1);
+              cityShown = true;
+            }
+          }
+          else {
+            String msgggCity = (String)("                ");
+            lastCity = "";
+            WriteRightOLED(msgggCity.c_str(), false, 1);
+            cityShown = false;
+          }
+
+          String restDistText = (String)((double)featureValue / 10);
+          char* restDist = restDistText.c_str();
+          
+          restDist[strlen(restDist)-1] = '\0';
+          
+          String msggg = (String)"TRIP " + (String)(restDist) + (String)" km          ";
+          WriteRightOLED(msggg.c_str(), false, 0);
+        }
+       else {
+          WriteRightOLED("                ", false, 0);
+        }
+      }
+      break;   
+
+    case 253:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        if (featureValue == 0) {
+          digitalWrite(cruisecontrol, LOW);
+          showTime = true;
+          WriteLeftOLED("                ", false, false);
+          String msggg = (String)lastTime + (String)"              ";
+          WriteLeftOLED(msggg.c_str(), false, true);
+        }
+        else {
+          digitalWrite(cruisecontrol, HIGH);
+          String msggg = (String)featureValue + (String)" km/h           ";
+          showTime = false;
+          WriteLeftOLED(msggg.c_str(), false, false);
+        }
+        
+      }
+      break;   
+
+    case 254:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        if(featureValue != 0) {
+          
+          msgFuel = featureValue;
+
+          String msggg = (String)("# ") + (String)(msgFuel) + (String)(" l ~ ") + (String)(msgRange) + (String)(" km          ");
+          WriteRightOLED(msggg.c_str(), false, 3);
+        }
+      }
+      break;
+
+    case 255:
+      if(state_electricity == 1) { // turn on only when electricity is on
+        if(featureValue != 0) {
+          
+          msgRange = featureValue;
+        }
+      }
+      break;
+
 
     // light test
     case 888:
@@ -461,6 +551,28 @@ void busCommunication() {
   }
 }
 
+void WriteRightOLED(char* msg, bool refill, int line) {
+  //char msgTemp[60];
+  //sprintf(msgTemp, "%s", msg);
+  
+  if(refill) {
+    Multi_OLEDFill(0, 0);
+  }
+  else {
+    Multi_OLEDWriteString(0, 0, line, msg, FONT_NORMAL, 0);
+  }
+}
+
+void WriteLeftOLED(char* msg, bool refill, bool middle) {
+  if(refill) Multi_OLEDFill(1, 0);
+  //else Multi_OLEDWriteString(1, 25, -1, (char*)"  :  ", FONT_LARGE, 0);
+  if(middle) {
+    Multi_OLEDWriteString(1, 25, -1, msg, FONT_LARGE, 0);
+  }
+  else {
+    Multi_OLEDWriteString(1, 0, -1, msg, FONT_LARGE, 0);
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -484,6 +596,15 @@ void setup() {
   pinMode(warn_handbrake, OUTPUT);
   pinMode(warn_battery, OUTPUT);
   pinMode(cruisecontrol, OUTPUT);
+  pinMode(trailer, OUTPUT);
+  pinMode(beacon, OUTPUT);
+  pinMode(both_indicators, OUTPUT);
+
+  // Initialize OLED displays
+  Multi_I2CInit(sda_list, scl_list, speed_list, NUM_BUSES);
+  Multi_OLEDInit(bus_list, addr_list, type_list, flip_list, invert_list, NUM_DISPLAYS);
+  Multi_OLEDSetContrast(0, 20);
+  Multi_OLEDSetContrast(1, 20);
 
   // Turn off all lights and set needles to 0
   clusterTurnOff();

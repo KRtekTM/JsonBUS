@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonBUS.client.InstrumentCl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SCSSdkClient.Demo", "scs-sdk-plugin\scs-client\C#\SCSSdkClient.Demo\SCSSdkClient.Demo\SCSSdkClient.Demo.csproj", "{8C5B8E63-E30D-4A5A-9729-05B593B12448}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonBUS.manager.ETS2", "JsonBUS.manager.ETS2\JsonBUS.manager.ETS2.csproj", "{25832229-3D2D-4F64-8F6B-85C72F6B73A6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JsonBUS.manager", "JsonBUS.manager.ETS2\JsonBUS.manager.csproj", "{25832229-3D2D-4F64-8F6B-85C72F6B73A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
