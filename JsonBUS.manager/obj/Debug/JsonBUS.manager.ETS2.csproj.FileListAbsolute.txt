@@ -1,0 +1,17 @@
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\JsonBUS.manager.ETS2.exe.config
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\JsonBUS.manager.ETS2.exe
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\JsonBUS.manager.ETS2.pdb
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\Newtonsoft.Json.dll
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\SCSSdkClient.dll
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\Newtonsoft.Json.xml
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.csprojAssemblyReference.cache
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.Form1.resources
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.Properties.Resources.resources
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.csproj.GenerateResource.cache
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.csproj.CoreCompileInputs.cache
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.csproj.CopyComplete
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.exe
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\obj\Debug\JsonBUS.manager.ETS2.pdb
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\NickBuhro.Translit.dll
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\NickBuhro.Translit.xml
+D:\_projects\JsonBUS\JsonBUS.manager.ETS2\bin\Debug\MimeTypesMap.dll
