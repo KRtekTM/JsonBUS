@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JsonBUS.peripherals.Hshifte
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JsonBUS.client.InstrumentCluster", "JsonBUS.client.InstrumentCluster\JsonBUS.client.InstrumentCluster.vcxproj", "{A1EFD682-2904-4BB1-BCDB-6FEA715F719C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JsonBUS.peripherals.Hshifter", "JsonBUS.peripherals.Hshifter\JsonBUS.peripherals.Hshifter.vcxproj", "{3114902D-898B-4A1F-97B7-A86012F571C7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JsonBUS.client.InstrumentCluster", "JsonBUS.client.InstrumentCluster\JsonBUS.client.InstrumentCluster.vcxproj", "{A1EFD682-2904-4BB1-BCDB-6FEA715F719C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

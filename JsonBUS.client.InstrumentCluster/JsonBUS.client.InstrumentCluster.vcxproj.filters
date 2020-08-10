@@ -17,8 +17,11 @@
   <ItemGroup>
     <None Include="JsonBUS.client.InstrumentCluster.ino" />
     <None Include="README.md" />
+<<<<<<< HEAD
     <None Include="JsonBUS.client.InstrumentCluster_new.ino" />
     <None Include="Configuration.ino" />
     <None Include="JsonBusParser.ino" />
+=======
+>>>>>>> master
   </ItemGroup>
 </Project>

@@ -26,7 +26,11 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+<<<<<<< HEAD
     <ConfigurationType>Utility</ConfigurationType>
+=======
+    <ConfigurationType>Application</ConfigurationType>
+>>>>>>> master
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
@@ -115,10 +119,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+<<<<<<< HEAD
     <None Include="Configuration.ino" />
     <None Include="JsonBUS.client.InstrumentCluster.ino" />
     <None Include="JsonBUS.client.InstrumentCluster_new.ino" />
     <None Include="JsonBusParser.ino" />
+=======
+    <None Include="JsonBUS.client.InstrumentCluster.ino" />
+>>>>>>> master
     <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
