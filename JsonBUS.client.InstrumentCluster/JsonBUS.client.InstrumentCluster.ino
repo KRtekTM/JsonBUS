@@ -8,33 +8,35 @@
 
 
 // PIN configuration
-//const SwitecX25 gauge_rpm(STEPS, 2,3,4,5); //uses 4 digital pins, 315*3=945 steps
-//const SwitecX25 gauge_speed(STEPS, 6,7,8,9); //uses 4 digital pins, 315*3=945 steps
-//const SwitecX25 gauge_temp(STEPS, 10,11,12,13); //uses 4 digital pins, 315*3=945 steps
-//const SwitecX25 gauge_gas(STEPS, 14,15,16,17); //uses 4 digital pins, 315*3=945 steps
+const SwitecX25 gauge_rpm(STEPS, A10,A11,A8,A9); //uses 4 digital pins, 315*3=945 steps
+const SwitecX25 gauge_speed(STEPS, A14,A15,A12,A13); //uses 4 digital pins, 315*3=945 steps
+const SwitecX25 gauge_temp(STEPS, A6,A7,A4,A5); //uses 4 digital pins, 315*3=945 steps
+const SwitecX25 gauge_gas(STEPS, A2,A3,A0,A1); //uses 4 digital pins, 315*3=945 steps
 const int cluster_light = 11;
-const int left_indicator = 22;
-const int right_indicator = 32;
-//const int both_indicators = 0; // for connecting HW button light on dashboard
-const int airbag = 23;
-const int light_lowbeam = 25;
-const int light_mainbeam = 27;
-const int light_fogFront = 24;
-const int light_fogRear = 26;
-const int warn_temp = 29;
-const int warn_gas = 31;
-const int warn_oil = 28;
-const int warn_engine = 33;
-const int warn_failure = 34;
-const int warn_abs = 35;
-const int warn_immobilizer = 36;
-const int warn_handbrake = 37;
-const int warn_battery = 38;
-const int cruisecontrol = 30;
-const int speaker = 42;
-const int trailer = 39;
-const int beacon = 40;
-const int both_indicators = 41;
+const int left_indicator = 52;
+const int right_indicator = 53;
+const int airbag = 36;
+const int light_lowbeam = 34;
+const int light_mainbeam = 48;
+const int light_fogFront = 33;
+const int light_fogRear = 32;
+const int warn_temp = 46;
+const int warn_gas = 49;
+const int warn_oil = 44;
+const int warn_engine = 37;
+const int warn_failure = 39;
+const int warn_abs = 38;
+const int warn_immobilizer = 41;
+const int warn_handbrake = 40;
+const int warn_battery = 43;
+const int warn_safe = 42;
+const int cruisecontrol = 47;
+const int speaker = 50;
+const int trailer = 35;
+const int beacon = 45;
+const int both_indicators = 30;
+const int button_left = 9;
+const int button_ext1 = 31;
 
 const int noteFrequency = 4500;
 
@@ -48,14 +50,17 @@ String lastCity = "";
 bool showTime = true;
 String lastTime = "";
 
-bool lowFuelBeep = false;
+bool lowFuelBeep, buttonPressed = false;
+float gasLevel, currentRPM, currentSpeed, currentTemp = 0;
+
+int clusterLightIntensity = 0;
 
 // OLED display settings
 #define NUM_DISPLAYS 2
 #define NUM_BUSES 2
 // I2C bus info
-uint8_t scl_list[NUM_BUSES] = {5,7}; //pins
-uint8_t sda_list[NUM_BUSES] = {6,8};  //pins
+uint8_t scl_list[NUM_BUSES] = {6,5}; //pins 5,6
+uint8_t sda_list[NUM_BUSES] = {8,7};  //pins 7,8
 int32_t speed_list[NUM_BUSES] = {4000000L,4000000L};
 // OLED display info
 uint8_t bus_list[NUM_DISPLAYS] = {0,1}; // can be multiple displays per bus
@@ -78,10 +83,13 @@ void clusterCelebration() {
   digitalWrite(warn_failure, HIGH);
   digitalWrite(warn_abs, HIGH);
   digitalWrite(warn_battery, HIGH); //will light up until ignition switch set to position 2
+  digitalWrite(warn_safe, HIGH);
 
-  // Needle sweep
-  //gauge_rpm.setPosition(STEPS);
-  //gauge_speed.setPosition(STEPS);
+  // Needle sweep start
+  //gauge_rpm.setPosition(750);
+  //gauge_rpm.updateBlocking();
+  //gauge_speed.setPosition(750);
+  //gauge_speed.updateBlocking();
 
   delay(500);
   
@@ -90,13 +98,17 @@ void clusterCelebration() {
 
   delay(500);
   
+  // Needle sweep end
   //gauge_rpm.setPosition(0);
+  //gauge_rpm.updateBlocking();
   //gauge_speed.setPosition(0);
+  //gauge_speed.updateBlocking();
   digitalWrite(warn_gas, LOW);
 
   delay(500);
   
   digitalWrite(warn_immobilizer, LOW);
+  digitalWrite(warn_safe, LOW);
   noTone(speaker);
 
   delay(500);
@@ -167,11 +179,17 @@ void clusterTurnOff() {
   digitalWrite(trailer, LOW);
   digitalWrite(beacon, LOW);
   digitalWrite(both_indicators, LOW);
+  digitalWrite(warn_safe, LOW);
 
-  //gauge_rpm.zero();
-  //gauge_speed.zero();
-  //gauge_temp.zero();
-  //gauge_gas.zero();
+  gasLevel = 0;
+  currentTemp = 0;
+  currentRPM = 0;
+  currentSpeed = 0;
+
+  gauge_rpm.zero();
+  gauge_speed.zero();
+  gauge_temp.zero();
+  gauge_gas.zero();
 
   WriteLeftOLED("", true, false);
   WriteRightOLED("",true,0);
@@ -179,7 +197,7 @@ void clusterTurnOff() {
 }
 
 void testLights() {
-  analogWrite(cluster_light, 100);
+  analogWrite(cluster_light, 255);
   digitalWrite(left_indicator, HIGH);
   digitalWrite(right_indicator, HIGH);
   digitalWrite(airbag, HIGH);
@@ -200,354 +218,385 @@ void testLights() {
   digitalWrite(trailer, HIGH);
   digitalWrite(beacon, HIGH);
   digitalWrite(both_indicators, HIGH);
+  digitalWrite(warn_safe, HIGH);
 }
 
-void busCommunication() {
+void busCommunication() { 
   // Loop until there is data waiting to be read
-  while (!Serial.available())
-  delay(50);
-
-  DynamicJsonBuffer jb;
-  JsonObject& root = jb.parseObject(Serial);
-
-  // Test if parsing succeeds.
-  if (!root.success()) {
-    //Serial.println("parseObject() failed");
-    return;
-  }
+  if(Serial.available())
+  {
   
-  // Fetch values.
-  //
-  // Most of the time, you can rely on the implicit casts.
-  // In other case, you can do root["time"].as<long>();
-  //const char* sensor = root["sensor"];
-  //long time = root["time"];
-  //double latitude = root["data"][0];
-  //double longitude = root["data"][1];
-
-
-  int feature = root["f"];
-  int featureValue = root["v"];
-  const char* featureText = root["t"];
-
-  // Print values.
-  Serial.println(feature);
-  Serial.println(featureValue);
-  Serial.println(featureText);
-
-  switch(feature) {
-    // electric on/off
-    case 230:
-      if(state_electricity != featureValue) {
-        (featureValue == 1) ? clusterCelebration() : clusterTurnOff();  
-        state_electricity = featureValue;
-      }
-      break;
-
-    // engine on/off
-    case 231:
-      if(state_electricity != 0) {
-        if (featureValue == 1) {
-          digitalWrite(warn_battery, LOW);
-        }
-        else {
-          digitalWrite(warn_battery, HIGH);
-        }
-      }
-      break;
-
-    // internet connected/disconnected
-    case 232:
-      if(state_electricity != 0) {
-        if (featureValue == 1) {
-          digitalWrite(airbag, HIGH);
-        }
-        else {
-          digitalWrite(airbag, LOW);
-        }
-      }
-      break;
-
-    // temp
-    case 233:
-      // turn the control on when temp is above 120°C
-      if (featureValue >= 120) {
-        digitalWrite(warn_temp, HIGH);
-      }
-      else {
-        digitalWrite(warn_temp, LOW);
-      }
-
-      // control the gauge (MIN=50°C,MAX=130°C)
-      if (featureValue <= 50) featureValue = 50;
-      if (featureValue >= 130) featureValue = 130;
-      // TODO calculate steps for X25.168 stepper motor to specific temp value
-      break;
-      
-    // gas level
-    case 234:
-      // turn the control on when gas level is below 15%
-      if (featureValue <= 15) {
-        digitalWrite(warn_gas, HIGH);
-        if(!lowFuelBeep) {
-          tone(speaker, noteFrequency, 500);
-          lowFuelBeep = true;
-        }
-      }
-      else {
-        digitalWrite(warn_gas, LOW);
-        lowFuelBeep = false;
-      }
-
-      // control the gauge (MIN=5%,MAX=100%)
-      if (featureValue <= 5) featureValue = 5;
-      if (featureValue >= 100) featureValue = 100;
-      // TODO calculate steps for X25.168 stepper motor to specific gas value
-      break;
-
-      // RPM
-    case 235:
-      // control the gauge (MIN=0,MAX=7500)
-      if (featureValue <= 0) featureValue = 0;
-      if (featureValue >= 7500) featureValue = 7500;
-      // TODO calculate steps for X25.168 stepper motor to specific rpm value
-      break;
-
-    // speed
-    case 236:
-      // control the gauge (MIN=0,MAX=240)
-      if (featureValue <= 0) featureValue = 0;
-      if (featureValue >= 240) featureValue = 240;
-      // TODO calculate steps for X25.168 stepper motor to specific speed value
-      break;
-
-    // low light beam on/off
-    case 237:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if (featureValue == 1) {
-          digitalWrite(light_lowbeam, HIGH);
-          //analogWrite(cluster_light, 100);
-        }
-        else {
-          digitalWrite(light_lowbeam, LOW);
-          //analogWrite(cluster_light, 0);
-        }
-      }
-      break;
-
-    // high light beam on/off
-    case 238:
-      (featureValue == 1) ? digitalWrite(light_mainbeam, HIGH) : digitalWrite(light_mainbeam, LOW);
-      break;
-
-    // cluster backlight on/off
-    case 239:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        analogWrite(cluster_light, featureValue);
-      }
-      break;
-
-    // indicators on/off
-    case 240:
-      switch(featureValue) {
-        case 1:
-          if(state_electricity == 1) { // turn on only when electricity is on
-            digitalWrite(left_indicator, HIGH);
-            digitalWrite(right_indicator, LOW);
-            if(state_blinker == 0) {
-              tone(speaker, 500, 10);
-              state_blinker = 1;
-            }
-          }
-          break;
-        case 2:
-          if(state_electricity == 1) { // turn on only when electricity is on
-            digitalWrite(left_indicator, LOW);
-            digitalWrite(right_indicator, HIGH);
-            if(state_blinker == 0) {
-              tone(speaker, 500, 10);
-              state_blinker = 1;
-            }
-          }
-          break;
-        case 3:
-          digitalWrite(left_indicator, HIGH);
-          digitalWrite(right_indicator, HIGH);
-          digitalWrite(both_indicators, HIGH);
-            if(state_blinker == 0) {
-              tone(speaker, 500, 10);
-              state_blinker = 1;
-            }
-          break;
-        default:
-          digitalWrite(left_indicator, LOW);
-          digitalWrite(right_indicator, LOW);
-          digitalWrite(both_indicators, LOW);
-          if(state_blinker == 1) {
-            tone(speaker, 300, 10);
-            state_blinker = 0;  
-          }
-          break;
-      }
-      break;
-
-    // front fog light on/off
-    case 241:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(light_fogFront, HIGH) : digitalWrite(light_fogFront, LOW);
-      }
-      break;
-
-    // rear fog light on/off
-    case 242:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(light_fogRear, HIGH) : digitalWrite(light_fogRear, LOW);
-      }
-      break;
-
-    // parking brake light on/off
-    case 244:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(warn_handbrake, HIGH) : digitalWrite(warn_handbrake, LOW);
-      }
-      break;
-
-    // motor brake light on/off
-    case 245:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue > 0) ? digitalWrite(warn_abs, HIGH) : digitalWrite(warn_abs, LOW);
-      }
-      break;
-
-    // engine damage report
-    case 246:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue >= 20) ? digitalWrite(warn_engine, HIGH) : digitalWrite(warn_engine, LOW);
-        (featureValue >= 25) ? digitalWrite(warn_failure, HIGH) : digitalWrite(warn_failure, LOW);
-        (featureValue >= 30) ? digitalWrite(warn_oil, HIGH) : digitalWrite(warn_oil, LOW);
-        (featureValue >= 40) ? digitalWrite(warn_temp, HIGH) : digitalWrite(warn_temp, LOW);
-        (featureValue >= 65) ? digitalWrite(airbag, HIGH) : digitalWrite(airbag, LOW);
-      }     
-      break;
-
-    // oil pressure warning light on/off
-    case 247:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(warn_oil, HIGH) : digitalWrite(warn_oil, LOW);
-      }
-      break;
-
-    // battery voltage warning light on/off
-    case 248:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(warn_battery, HIGH) : digitalWrite(warn_battery, LOW);
-      }
-      break;
-
-    // trailer attache indicator on/off
-    case 249:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(trailer, HIGH) : digitalWrite(trailer, LOW);
-      }
-      break;
-
-    // beacon light indicator on/off
-    case 250:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        (featureValue == 1) ? digitalWrite(beacon, HIGH) : digitalWrite(beacon, LOW);
-      }
-      break;
-
-    case 251:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if(featureValue != 0) {
-          lastTime = featureText;
-          if(showTime) {
-            String msggg = (String)lastTime + (String)"              ";
-            WriteLeftOLED(msggg.c_str(), false, true);  
-          }
-        }
-      }
-      break;  
-
+    DynamicJsonBuffer jb;
+    JsonObject& root = jb.parseObject(Serial);
+  
+    // Test if parsing succeeds.
+    if (!root.success()) {
+      Serial.println("parseObject() failed");
+      return;
+    }
     
-    case 252:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if(featureValue != 0) {
-          if((String)featureText != "NULL" && (String)featureText != "") {
-            if(!cityShown || lastCity != (String)(featureText)) {
-              lastCity = (String)(featureText);
-              String msgggCity = lastCity + (String)("                ");
-              WriteRightOLED(msgggCity.c_str(), false, 1);
-              cityShown = true;
-            }
+    // Fetch values.
+    //
+    // Most of the time, you can rely on the implicit casts.
+    // In other case, you can do root["time"].as<long>();
+    //const char* sensor = root["sensor"];
+    //long time = root["time"];
+    //double latitude = root["data"][0];
+    //double longitude = root["data"][1];
+  
+    int feature = root["f"];
+    double featureValue = root["v"];
+    const char* featureText = root["t"];
+    
+    
+    // Print values.
+    //Serial.println(feature);
+    //Serial.println(featureValue);
+    //Serial.println(featureText);
+  
+    switch(feature) {
+      // electric on/off
+      case 230:
+        if(state_electricity != (int)featureValue) {
+          ((int)featureValue == 1) ? clusterCelebration() : clusterTurnOff();  
+          state_electricity = (int)featureValue;
+        }
+        break;
+  
+      // engine on/off
+      case 231:
+        if(state_electricity != 0) {
+          if ((int)featureValue == 1) {
+            digitalWrite(warn_battery, LOW);
           }
           else {
-            String msgggCity = (String)("                ");
-            lastCity = "";
-            WriteRightOLED(msgggCity.c_str(), false, 1);
-            cityShown = false;
+            digitalWrite(warn_battery, HIGH);
           }
-
-          String restDistText = (String)((double)featureValue / 10);
-          char* restDist = restDistText.c_str();
-          
-          restDist[strlen(restDist)-1] = '\0';
-          
-          String msggg = (String)"TRIP " + (String)(restDist) + (String)" km          ";
-          WriteRightOLED(msggg.c_str(), false, 0);
         }
-       else {
-          WriteRightOLED("                ", false, 0);
+        break;
+  
+      // internet connected/disconnected
+      case 232:
+        if(state_electricity != 0) {
+          if ((int)featureValue == 1) {
+            digitalWrite(airbag, HIGH);
+          }
+          else {
+            digitalWrite(airbag, LOW);
+          }
         }
-      }
-      break;   
-
-    case 253:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if (featureValue == 0) {
-          digitalWrite(cruisecontrol, LOW);
-          showTime = true;
-          WriteLeftOLED("                ", false, false);
-          String msggg = (String)lastTime + (String)"              ";
-          WriteLeftOLED(msggg.c_str(), false, true);
+        break;
+  
+      // temp
+      case 233:
+        // turn the control on when temp is above 120°C
+        if (featureValue >= 120) {
+          digitalWrite(warn_temp, HIGH);
         }
         else {
-          digitalWrite(cruisecontrol, HIGH);
-          String msggg = (String)featureValue + (String)" km/h           ";
-          showTime = false;
-          WriteLeftOLED(msggg.c_str(), false, false);
+          digitalWrite(warn_temp, LOW);
         }
+  
+        // control the gauge (MIN=50°C,MAX=130°C)// range 80°C shown on 260 steps
+        if (featureValue <= 50) currentTemp = 0;
+        if (featureValue > 50 && featureValue < 130) currentTemp = (featureValue - 50) * 3.25;  
+        if (featureValue >= 130) currentTemp = (130 - 50) * 3.25;
+        // TODO calculate steps for X25.168 stepper motor to specific temp value
+        break;
         
-      }
-      break;   
-
-    case 254:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if(featureValue != 0) {
-          
-          msgFuel = featureValue;
-
-          String msggg = (String)("# ") + (String)(msgFuel) + (String)(" l ~ ") + (String)(msgRange) + (String)(" km          ");
-          WriteRightOLED(msggg.c_str(), false, 3);
+      // gas level
+      case 234:
+        // turn the control on when gas level is below 15%
+        if (featureValue <= 15) {
+          digitalWrite(warn_gas, HIGH);
+          if(!lowFuelBeep) {
+            tone(speaker, noteFrequency, 500);
+            lowFuelBeep = true;
+          }
         }
-      }
-      break;
-
-    case 255:
-      if(state_electricity == 1) { // turn on only when electricity is on
-        if(featureValue != 0) {
-          
-          msgRange = featureValue;
+        else {
+          digitalWrite(warn_gas, LOW);
+          lowFuelBeep = false;
         }
-      }
-      break;
-
-
-    // light test
-    case 888:
-      if (featureValue == 1 && state_electricity == 0) testLights();
-      break;  
+  
+        // control the gauge (MIN=5%,MAX=100%)
+        if (featureValue <= 5) featureValue = 0;
+        if (featureValue >= 100) featureValue = 100;
+        gasLevel = featureValue * 2.85;
+        
+        break;
+  
+        // RPM
+      case 235:
+        // control the gauge (MIN=0,MAX=7500)
+        if (featureValue <= 0) featureValue = 0;
+        if (featureValue >= 7500) featureValue = 7500;
+        // TODO calculate steps for X25.168 stepper motor to specific rpm value
+        currentRPM = featureValue / 10;
+        break;
+  
+      // speed
+      case 236:
+        // control the gauge (MIN=0,MAX=240)
+        if (featureValue <= 0) featureValue = 0;
+        if (featureValue >= 230) featureValue = 230;
+  
+        // TODO calculate steps for X25.168 stepper motor to specific speed value
+        if (featureValue == 0) currentSpeed = 0;
+        if (featureValue > 0 && featureValue <= 120) currentSpeed = featureValue * 3.8;
+        if (featureValue > 120 && featureValue <= 150) currentSpeed = featureValue * 3.6;
+        if (featureValue > 150 && featureValue <= 230) currentSpeed = featureValue * 3.35;
+        break;
+  
+      // low light beam on/off
+      case 237:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if (featureValue == 1) {
+            digitalWrite(light_lowbeam, HIGH);
+            //analogWrite(cluster_light, clusterLightIntensity);
+          }
+          else {
+            digitalWrite(light_lowbeam, LOW);
+            //analogWrite(cluster_light, 0);
+          }
+        }
+        break;
+  
+      // high light beam on/off
+      case 238:
+        ((int)featureValue == 1) ? digitalWrite(light_mainbeam, HIGH) : digitalWrite(light_mainbeam, LOW);
+        break;
+  
+      // cluster backlight on/off
+      case 239:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          //clusterLightIntensity = featureValue;
+          analogWrite(cluster_light, (int)featureValue);
+        }
+        else {
+          //clusterLightIntensity = 0;
+          analogWrite(cluster_light, 0);
+        }
+        break;
+  
+      // indicators on/off
+      case 240:
+        switch((int)featureValue) {
+          case 1:
+            if(state_electricity == 1) { // turn on only when electricity is on
+              digitalWrite(left_indicator, HIGH);
+              digitalWrite(right_indicator, LOW);
+              if(state_blinker == 0) {
+                tone(speaker, 500, 10);
+                state_blinker = 1;
+              }
+            }
+            break;
+          case 2:
+            if(state_electricity == 1) { // turn on only when electricity is on
+              digitalWrite(left_indicator, LOW);
+              digitalWrite(right_indicator, HIGH);
+              if(state_blinker == 0) {
+                tone(speaker, 500, 10);
+                state_blinker = 1;
+              }
+            }
+            break;
+          case 3:
+            digitalWrite(left_indicator, HIGH);
+            digitalWrite(right_indicator, HIGH);
+            digitalWrite(both_indicators, HIGH);
+              if(state_blinker == 0) {
+                tone(speaker, 500, 10);
+                state_blinker = 1;
+              }
+            break;
+          default:
+            digitalWrite(left_indicator, LOW);
+            digitalWrite(right_indicator, LOW);
+            digitalWrite(both_indicators, LOW);
+            if(state_blinker == 1) {
+              tone(speaker, 300, 10);
+              state_blinker = 0;  
+            }
+            break;
+        }
+        break;
+  
+      // front fog light on/off
+      case 241:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(light_fogFront, HIGH) : digitalWrite(light_fogFront, LOW);
+        }
+        break;
+  
+      // rear fog light on/off
+      case 242:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(light_fogRear, HIGH) : digitalWrite(light_fogRear, LOW);
+        }
+        break;
+  
+      // parking brake light on/off
+      case 244:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(warn_handbrake, HIGH) : digitalWrite(warn_handbrake, LOW);
+        }
+        break;
+  
+      // motor brake light on/off
+      case 245:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue > 0) ? digitalWrite(warn_abs, HIGH) : digitalWrite(warn_abs, LOW);
+        }
+        break;
+  
+      // engine damage report
+      case 246:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue >= 20) ? digitalWrite(warn_engine, HIGH) : digitalWrite(warn_engine, LOW);
+          ((int)featureValue >= 25) ? digitalWrite(warn_failure, HIGH) : digitalWrite(warn_failure, LOW);
+          ((int)featureValue >= 30) ? digitalWrite(warn_oil, HIGH) : digitalWrite(warn_oil, LOW);
+          ((int)featureValue >= 40) ? digitalWrite(warn_temp, HIGH) : digitalWrite(warn_temp, LOW);
+          ((int)featureValue >= 65) ? digitalWrite(airbag, HIGH) : digitalWrite(airbag, LOW);
+        }     
+        break;
+  
+      // oil pressure warning light on/off
+      case 247:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(warn_oil, HIGH) : digitalWrite(warn_oil, LOW);
+        }
+        break;
+  
+      // battery voltage warning light on/off
+      case 248:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(warn_battery, HIGH) : digitalWrite(warn_battery, LOW);
+        }
+        break;
+  
+      // trailer attache indicator on/off
+      case 249:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(trailer, HIGH) : digitalWrite(trailer, LOW);
+        }
+        break;
+  
+      // beacon light indicator on/off
+      case 250:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          ((int)featureValue == 1) ? digitalWrite(beacon, HIGH) : digitalWrite(beacon, LOW);
+        }
+        break;
+  
+      case 251:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if((int)featureValue != 0) {
+            lastTime = featureText;
+            if(showTime) {
+              String msggg = (String)lastTime + (String)"              ";
+              WriteLeftOLED(msggg.c_str(), false, true);  
+            }
+          }
+        }
+        break;  
+  
+      
+      case 252:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if((int)featureValue != 0) {
+            if((String)featureText != "NULL" && (String)featureText != "") {
+              if(!cityShown || lastCity != (String)(featureText)) {
+                lastCity = (String)(featureText);
+                String msgggCity = lastCity + (String)("                ");
+                WriteRightOLED(msgggCity.c_str(), false, 1);
+                cityShown = true;
+              }
+            }
+            else {
+              String msgggCity = (String)("                ");
+              lastCity = "";
+              WriteRightOLED(msgggCity.c_str(), false, 1);
+              cityShown = false;
+            }
+  
+            String restDistText = (String)(featureValue / 10);
+            char* restDist = restDistText.c_str();
+            
+            restDist[strlen(restDist)-1] = '\0';
+            
+            String msggg = (String)"TRIP " + (String)(restDist) + (String)" km          ";
+            WriteRightOLED(msggg.c_str(), false, 0);
+          }
+         else {
+            WriteRightOLED("                ", false, 0);
+          }
+        }
+        break;   
+  
+      case 253:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if ((int)featureValue == 0) {
+            digitalWrite(cruisecontrol, LOW);
+            showTime = true;
+            WriteLeftOLED("                ", false, false);
+            String msggg = (String)lastTime + (String)"              ";
+            WriteLeftOLED(msggg.c_str(), false, true);
+          }
+          else {
+            digitalWrite(cruisecontrol, HIGH);
+            String msggg = (String)featureValue + (String)" km/h           ";
+            showTime = false;
+            WriteLeftOLED(msggg.c_str(), false, false);
+          }
+          
+        }
+        break;   
+  
+      case 254:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if((int)featureValue != 0) {
+            
+            msgFuel = featureValue;
+  
+            String msggg = (String)("# ") + (String)(msgFuel) + (String)(" l ~ ") + (String)(msgRange) + (String)(" km          ");
+            WriteRightOLED(msggg.c_str(), false, 3);
+          }
+        }
+        break;
+  
+      case 255:
+        if(state_electricity == 1) { // turn on only when electricity is on
+          if((int)featureValue != 0) {
+            
+            msgRange = featureValue;
+          }
+        }
+        break;
+  
+  
+      // light test
+      case 888:
+        if ((int)featureValue == 1 && state_electricity == 0) testLights();
+        break;  
+  
+      // zero gauges
+      case 999:
+        gauge_rpm.zero();
+        gauge_speed.zero();
+        gauge_temp.zero();
+        gauge_gas.zero();
+        break;
+    }
+  
+    if(buttonPressed == true) {
+      gauge_rpm.zero();
+      gauge_speed.zero();
+      gauge_temp.zero();
+      gauge_gas.zero();  
+      buttonPressed = false;
+    }
   }
 }
 
@@ -599,6 +648,9 @@ void setup() {
   pinMode(trailer, OUTPUT);
   pinMode(beacon, OUTPUT);
   pinMode(both_indicators, OUTPUT);
+  pinMode(warn_safe, OUTPUT);
+  pinMode(button_left, INPUT_PULLUP);
+  pinMode(button_ext1, INPUT_PULLUP);
 
   // Initialize OLED displays
   Multi_I2CInit(sda_list, scl_list, speed_list, NUM_BUSES);
@@ -617,5 +669,21 @@ void loop() {
   //gauge_temp.update();
   //gauge_gas.update();
 
+  if(digitalRead(button_left) == LOW || digitalRead(button_ext1) == LOW) {
+    buttonPressed = true;
+  }
+
   busCommunication();
+
+  gauge_rpm.setPosition(currentRPM);
+  gauge_rpm.updateBlocking();
+
+  gauge_speed.setPosition(currentSpeed);
+  gauge_speed.updateBlocking();
+
+  gauge_temp.setPosition(currentTemp);
+  gauge_temp.updateBlocking();
+
+  gauge_gas.setPosition(gasLevel);
+  gauge_gas.updateBlocking();
 }
