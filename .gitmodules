@@ -3,4 +3,4 @@
 	url = git@github.com:KRtekTM/scs-sdk-plugin.git
 [submodule "JsonBUS.client.InstrumentCluster/libraries/SwitecX25"]
 	path = JsonBUS.client.InstrumentCluster/libraries/SwitecX25
-	url = git@github.com:KRtkovo-eu/SwitecX25.git
+	url = https://github.com/KRtkovo-eu/SwitecX25_X27.git
