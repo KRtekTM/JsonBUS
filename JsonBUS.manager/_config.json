@@ -1,5 +1,5 @@
 {
   "httpListen":  true,
   "httpListenPort": "8085",
-  "serialPorts": [ "COM13" ],
+  "serialPorts": [ "COM4" ],
 }

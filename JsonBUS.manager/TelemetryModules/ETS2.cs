@@ -80,9 +80,9 @@ namespace JsonBUS.manager.TelemetryModules
         public override bool Trailer => _data.TrailerValues[0].Attached;
         public override double DashLightLevel => (_data.TruckValues.CurrentValues.LightsValues.DashboardBacklight * 255);
         public override bool Airbag => false;
-        public override bool FogFront => _data.TruckValues.CurrentValues.DashboardValues.GearDashboards;
+        public override bool FogFront => false;//(_data.TruckValues.CurrentValues.DashboardValues.GearDashboards == 0 ? true : false);
         public override bool FogRear => _data.TruckValues.CurrentValues.LightsValues.Reverse;
-        public override bool OilWarn => false;
+        public override bool OilWarn => _data.TruckValues.CurrentValues.DashboardValues.WarningValues.OilPressure;
         public override bool EngineWarn => false;
         public override bool Failure => false;
         public override bool Immobilizer => false;
@@ -106,5 +106,9 @@ namespace JsonBUS.manager.TelemetryModules
         public override double TripDistance => (Math.Round(_data.NavigationValues.NavigationDistance / 1000, 1) * 10); //source is in meters, we send km with precision on 1 decimal
         public override bool CruiseControl => _data.TruckValues.CurrentValues.DashboardValues.CruiseControl;
         public override double CruiseControlValue => Math.Ceiling(_data.TruckValues.CurrentValues.DashboardValues.CruiseControlSpeed.Kph);
+        public override double SpeedLimit => Math.Abs(Math.Ceiling(_data.NavigationValues.SpeedLimit.Kph));
+
+        public override bool ForwardGearCountReached => (_data.TruckValues.ConstantsValues.MotorValues.ForwardGearCount == _data.TruckValues.CurrentValues.MotorValues.GearValues.Selected);
+        public override int GearSelected => _data.TruckValues.CurrentValues.MotorValues.GearValues.Selected;
     }
 }

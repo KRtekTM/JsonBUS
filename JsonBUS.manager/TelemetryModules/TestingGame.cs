@@ -35,38 +35,38 @@ namespace JsonBUS.manager.TelemetryModules
             {
                 ManagerForm.PushTelemetry();
 
-                if(blinkControl >= 35)
+                if(blinkControl >= 5)
                 {
                     // Continuously decrease fuel level, when droped below 10 restart
-                    if (fuelAmount <= 20)
-                    {
-                        fuelAmount = 1000;
-                        speed = 0;
-                        rpm = 0;
-                        temp = 0;
-                    }
-                    else
-                    {
-                        fuelAmount = fuelAmount - 15;
-                        if (speed >= 220)
-                        {
-                            speed = 0;
-                        }
-                        if (rpm >= 5000)
-                        {
-                            rpm = 0;
-                        }
-                        if (temp > 110)
-                        {
-                            temp = 0;
-                        }
+                    //if (fuelAmount <= 20)
+                    //{
+                    //    fuelAmount = 1000;
+                    //    speed = 0;
+                    //    rpm = 0;
+                    //    temp = 0;
+                    //}
+                    //else
+                    //{
+                    //    fuelAmount = fuelAmount - 15;
+                    //    if (speed >= 220)
+                    //    {
+                    //        speed = 0;
+                    //    }
+                    //    if (rpm >= 5000)
+                    //    {
+                    //        rpm = 0;
+                    //    }
+                    //    if (temp > 110)
+                    //    {
+                    //        temp = 0;
+                    //    }
 
                         
-                        speed++;
-                        rpm++;
-                        temp++;
+                    //    speed++;
+                    //    rpm++;
+                    //    temp++;
 
-                    }
+                    //}
 
                     blinkNow = blinkNow ? false : true;
                     manualTest.leftIndicator.BackgroundImage = (manualTest.leftIndicator.Checked && blinkNow) ? Properties.Resources.leftT : Properties.Resources.left;
@@ -76,7 +76,7 @@ namespace JsonBUS.manager.TelemetryModules
 
                 blinkControl++;
 
-                System.Threading.Thread.Sleep(10);
+                System.Threading.Thread.Sleep(100);
             }
         }
 
@@ -134,5 +134,8 @@ namespace JsonBUS.manager.TelemetryModules
         public override bool Immobilizer => false;
         public override bool SafeWarn => false;
         public override bool Speaker => false;
+        public override double SpeedLimit => 0;
+        public override bool ForwardGearCountReached => false;
+        public override int GearSelected => 0;
     }
 }

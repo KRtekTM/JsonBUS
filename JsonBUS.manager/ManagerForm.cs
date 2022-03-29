@@ -7,6 +7,8 @@ using System.IO.Ports;
 using System.Threading;
 using System.Windows.Forms;
 using NickBuhro.Translit;
+using System.Net.NetworkInformation;
+using Newtonsoft.Json;
 
 namespace JsonBUS.manager
 {
@@ -21,9 +23,12 @@ namespace JsonBUS.manager
 
         private static string timeMsg, cityDest = "";
         private static double fuelamount, range, distance, speed, gas, rpm, temp, cruiseVal, dashLightState = 0;
-        private static bool state_electricity, beaconState, lowBeamState, mainBeamState, parkingBrakeState, absState, trailerState, engineState, ccState, blinkerL, blinkerR, rearFogState = false;
+        private static bool state_electricity, beaconState, lowBeamState, mainBeamState, parkingBrakeState, absState, trailerState, engineState, ccState, blinkerL, blinkerR, rearFogState, frontFogState, netState = false;
 
         private static int damageState = 0;
+
+        //private static DateTime lastBlink, lastGearBlink;
+        //private static int lastBlinkForce, lastGearBlinkForce = 0;
 
 
         private void button1_Click(object sender, EventArgs e)
@@ -96,6 +101,20 @@ namespace JsonBUS.manager
 
 
         internal static void PushTelemetry() {
+            /*try
+            {
+                if (GameTelemetry.GameRunning)
+                {
+                    string jsonTelemetryObj = JsonConvert.SerializeObject(GameTelemetry);
+                    WriteLineAllSerialPorts(jsonTelemetryObj);
+                }
+            }
+            catch
+            {
+
+            }*/
+
+
             try {
                 // Open Serial port to communicate with JsonBUS client
                 foreach (var Port in Ports)
@@ -145,7 +164,7 @@ namespace JsonBUS.manager
                         if (state_electricity != electricityNow)
                         {
                             state_electricity = electricityNow;
-                            WriteLineAllSerialPorts("{\"f\":230,\"v\":" + (state_electricity ? "1" : "0") + "}");
+
                             if (!state_electricity)
                             {
                                 beaconState = false;
@@ -164,10 +183,31 @@ namespace JsonBUS.manager
                                 cruiseVal = 0;
                                 cityDest = "";
                             }
+                            else
+                            {
+                                WriteLineAllSerialPorts("{\"f\":239,\"v\":" + 255 + "}");
+                                WriteLineAllSerialPorts("{\"f\":233,\"v\":" + GameTelemetry.WaterTemp + "}");
+                                WriteLineAllSerialPorts("{\"f\":234,\"v\":" + GameTelemetry.FuelAmountPercent + "}");
+                            }
+                            WriteLineAllSerialPorts("{\"f\":230,\"v\":" + (state_electricity ? "1" : "0") + "}");
                         }
 
                         if (state_electricity)
                         {
+                            // Gas
+                            var tempActual = GameTelemetry.WaterTemp;
+                            if (temp != tempActual && GameTelemetry.ElectricityOn)
+                            {
+                                temp = tempActual;
+                                WriteLineAllSerialPorts("{\"f\":233,\"v\":" + tempActual + "}");
+                            }
+
+                            var gasLevelPercentage = GameTelemetry.FuelAmountPercent;
+                            if (gas != gasLevelPercentage && GameTelemetry.ElectricityOn)
+                            {
+                                gas = gasLevelPercentage;
+                                WriteLineAllSerialPorts("{\"f\":234,\"v\":" + gasLevelPercentage + "}");
+                            }
                             // Engine enabled
                             var engineNow = GameTelemetry.Engine;
                             if (engineState != engineNow)
@@ -231,6 +271,13 @@ namespace JsonBUS.manager
                                     WriteLineAllSerialPorts("{\"f\":250,\"v\":" + (beaconState ? "1" : "0") + "}");
                                 }
 
+                                var frontFogNow = GameTelemetry.FogFront;
+                                if (frontFogState != frontFogNow)
+                                {
+                                    frontFogState = frontFogNow;
+                                    WriteLineAllSerialPorts("{\"f\":241,\"v\":" + (frontFogState ? "1" : "0") + "}");
+                                }
+
                                 var rearFogNow = GameTelemetry.FogRear;
                                 if (rearFogState != rearFogNow)
                                 {
@@ -238,22 +285,15 @@ namespace JsonBUS.manager
                                     WriteLineAllSerialPorts("{\"f\":242,\"v\":" + (rearFogState ? "1" : "0") + "}");
                                 }
 
+                                //var netNow = new Ping().Send("www.google.com.mx").Status == IPStatus.Success;
+                                //if (netState != netNow)
+                                //{
+                                //    netState = netNow;
+                                //    // if net not available, turn on oil pressure icon
+                                //    WriteLineAllSerialPorts("{\"f\":247,\"v\":" + (netState ? "0" : "1") + "}");
+                                //}
+
                                 // GAUGES
-                                // Gas
-                                var tempActual = GameTelemetry.WaterTemp;
-                                if (temp != tempActual && GameTelemetry.ElectricityOn)
-                                {
-                                    temp = tempActual;
-                                    WriteLineAllSerialPorts("{\"f\":233,\"v\":" + tempActual + "}");
-                                }
-
-                                var gasLevelPercentage = GameTelemetry.FuelAmountPercent;
-                                if (gas != gasLevelPercentage && GameTelemetry.ElectricityOn)
-                                {
-                                    gas = gasLevelPercentage;
-                                    WriteLineAllSerialPorts("{\"f\":234,\"v\":" + gasLevelPercentage + "}");
-                                }
-
                                 var rpmActual = GameTelemetry.RPM;
                                 if (rpm != rpmActual && GameTelemetry.Engine)
                                 {
@@ -265,12 +305,19 @@ namespace JsonBUS.manager
                                 if (speed != speedActual && GameTelemetry.Engine)
                                 {
                                     speed = speedActual;
-                                    WriteLineAllSerialPorts("{\"f\":236,\"v\":" + speedActual + "}");
+                                    WriteLineAllSerialPorts("{\"f\":236,\"v\":" + (speedActual + 2) + "}");
+                                    WriteLineAllSerialPorts("{\"f\":235,\"v\":" + rpmActual + "}");
                                 }
 
                                 // Displays
                                 // LEFT for time
-                                var timeMsgNew = GameTelemetry.TimeMessage;
+                                string gearSelected = GameTelemetry.GearSelected < 0 ? "R" : GameTelemetry.GearSelected.ToString();
+                                gearSelected = gearSelected == "0" ? "N" : gearSelected;
+                                
+                                gearSelected = (rpm > 4600 && !GameTelemetry.ForwardGearCountReached) ? "UP" : gearSelected;
+                                gearSelected = (rpm < 1500 && GameTelemetry.GearSelected > 1) ? "DOWN" : gearSelected;
+
+                                var timeMsgNew = $"{GameTelemetry.TimeMessage} {gearSelected}";
                                 if (timeMsgNew != timeMsg)
                                 {
                                     timeMsg = timeMsgNew;
@@ -295,7 +342,7 @@ namespace JsonBUS.manager
                                 }
 
                                 var ccNow = GameTelemetry.CruiseControl;
-                                var cruiseValNow = GameTelemetry.CruiseControlValue;
+                                var cruiseValNow = Convert.ToInt32(GameTelemetry.CruiseControlValue);
                                 if (cruiseValNow % 10 == 1 || cruiseValNow % 10 == 6)
                                 {
                                     cruiseValNow--;
@@ -305,7 +352,8 @@ namespace JsonBUS.manager
                                 {
                                     ccState = ccNow;
                                     cruiseVal = cruiseValNow;
-                                    WriteLineAllSerialPorts("{\"f\":253,\"v\":" + (ccState ? cruiseValNow.ToString() : "0") + "}");
+                                    string cruiseValText = $"{cruiseValNow}";
+                                    WriteLineAllSerialPorts("{\"f\":253,\"v\":" + (ccState ? cruiseValText : "0") + "}");
                                 }
 
                                 var fuelamountNew = GameTelemetry.FuelAmountLitres;
@@ -317,6 +365,33 @@ namespace JsonBUS.manager
                                     WriteLineAllSerialPorts("{\"f\":255,\"v\":" + range + "}");
                                     WriteLineAllSerialPorts("{\"f\":254,\"v\":" + fuelamount + "}");
                                 }
+
+                                //if(speed > (GameTelemetry.SpeedLimit + 5) && GameTelemetry.SpeedLimit > 0)
+                                //{
+                                //    if (DateTime.Compare(DateTime.Now, lastBlink.AddSeconds(0.3)) >= 0)
+                                //    {
+                                //        lastBlink = DateTime.Now;
+                                //        WriteLineAllSerialPorts("{\"f\":256,\"v\":" + lastBlinkForce.ToString() + "}");
+                                //        lastBlinkForce = (lastBlinkForce == 0 ? 1 : 0);
+                                //    }
+                                //}
+                                //else
+                                //{
+                                //    WriteLineAllSerialPorts("{\"f\":256,\"v\":0}");
+                                //}
+
+                                //if (gearSelected == "UP" || gearSelected == "DOWN")                                {
+                                //    if (DateTime.Compare(DateTime.Now, lastGearBlink.AddSeconds(0.5)) >= 0)
+                                //    {
+                                //        lastGearBlink = DateTime.Now;
+                                //        WriteLineAllSerialPorts("{\"f\":257,\"v\":" + lastGearBlinkForce.ToString() + "}");
+                                //        lastGearBlinkForce = (lastGearBlinkForce == 0 ? 1 : 0);
+                                //    }
+                                //}
+                                //else
+                                //{
+                                //    WriteLineAllSerialPorts("{\"f\":257,\"v\":0}");
+                                //}
 
                             }
                         }
@@ -357,7 +432,8 @@ namespace JsonBUS.manager
         {
             foreach(var port in Ports)
             {
-                if (port.IsOpen) port.WriteLine(value);
+                if (!port.IsOpen) port.Open();               
+                if(port.IsOpen) port.WriteLine(value);
             }
         }
 

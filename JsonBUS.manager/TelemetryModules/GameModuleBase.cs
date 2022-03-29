@@ -139,6 +139,9 @@
         public abstract bool Immobilizer { get; }
         public abstract bool SafeWarn { get;  }
         public abstract bool Speaker { get; }
+        public abstract double SpeedLimit { get; }
+        public abstract bool ForwardGearCountReached { get; }
+        public abstract int GearSelected { get; }
     }
 }
 
